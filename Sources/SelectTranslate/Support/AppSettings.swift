@@ -41,6 +41,11 @@ final class AppSettings: ObservableObject {
     @Published var claudeCodePath: String {
         didSet { defaults.set(claudeCodePath, forKey: "claudeCodePath") }
     }
+    /// CLAUDE_CONFIG_DIR truyền cho `claude`; để trống = không đặt. Claude Code lưu phiên đăng nhập
+    /// riêng theo biến này, nên phải khớp với lúc chạy `claude` đăng nhập trong terminal.
+    @Published var claudeConfigDir: String {
+        didSet { defaults.set(claudeConfigDir, forKey: "claudeConfigDir") }
+    }
     @Published var apiKey: String {
         didSet { Keychain.write(apiKey, account: Self.apiKeyAccount) }
     }
@@ -70,6 +75,7 @@ final class AppSettings: ObservableObject {
         provider = Provider(rawValue: defaults.string(forKey: "provider") ?? "")
             ?? (ClaudeCodeClient.locate(customPath: "", useShellPath: false) != nil ? .claudeCode : .apiKey)
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""
+        claudeConfigDir = defaults.string(forKey: "claudeConfigDir") ?? ""
         apiKey = Keychain.read(account: Self.apiKeyAccount) ?? ""
         isEnabled = defaults.object(forKey: "isEnabled") as? Bool ?? true
         model = defaults.string(forKey: "model") ?? ModelOption.defaultID

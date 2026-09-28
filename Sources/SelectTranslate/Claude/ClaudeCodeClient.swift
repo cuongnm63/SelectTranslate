@@ -71,11 +71,11 @@ enum ClaudeCodeClient {
     }
 
     /// `claude --version` — dùng cho nút "Kiểm tra" trong Settings. Chạy blocking, gọi từ background.
-    static func version(executable: String) -> String? {
+    static func version(executable: String, configDir: String) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = ["--version"]
-        process.environment = environment(for: executable)
+        process.environment = environment(for: executable, configDir: configDir)
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle.nullDevice
@@ -101,7 +101,7 @@ enum ClaudeCodeClient {
                 "--system-prompt", system,
                 "--max-turns", "1",
             ]
-            process.environment = environment(for: executable)
+            process.environment = environment(for: executable, configDir: AppSettings.shared.claudeConfigDir)
             // Thư mục tạm: tránh Claude Code đọc CLAUDE.md / settings của project nào đó.
             process.currentDirectoryURL = FileManager.default.temporaryDirectory
 
@@ -147,7 +147,11 @@ enum ClaudeCodeClient {
                               let message = obj["message"] as? [String: Any],
                               let content = message["content"] as? [[String: Any]] else { return }
                         let text = content.compactMap { $0["text"] as? String }.joined()
-                        if !text.isEmpty {
+                        // Lỗi (vd "authentication_failed") cũng tới dưới dạng message assistant chứa
+                        // chữ báo lỗi — không phải câu trả lời.
+                        if obj["error"] != nil {
+                            resultError = text.isEmpty ? "\(obj["error"]!)" : text
+                        } else if !text.isEmpty {
                             yielded = true
                             continuation.yield(text)
                         }
@@ -202,10 +206,14 @@ enum ClaudeCodeClient {
         }
     }
 
-    private static func environment(for executable: String) -> [String: String] {
+    private static func environment(for executable: String, configDir: String) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         // Bỏ API key để Claude Code dùng tài khoản đã đăng nhập (gói Pro/Max).
         env.removeValue(forKey: "ANTHROPIC_API_KEY")
+        // App mở từ Finder không có CLAUDE_CONFIG_DIR của shell → Claude Code đọc phiên đăng nhập
+        // khác (có thể đã hết hạn). Đặt lại theo Settings nếu người dùng cấu hình.
+        let dir = (configDir.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath
+        if !dir.isEmpty { env["CLAUDE_CONFIG_DIR"] = dir }
         let binDir = (executable as NSString).deletingLastPathComponent
         env["PATH"] = "\(binDir):\(shellPATH)"
         return env

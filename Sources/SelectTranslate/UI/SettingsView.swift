@@ -112,11 +112,15 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Kiểm tra") { checkClaudeCode() }
             }
+            TextField("CLAUDE_CONFIG_DIR (để trống = mặc định)", text: $settings.claudeConfigDir)
+                .textFieldStyle(.roundedBorder)
+                .help("Điền nếu bạn đăng nhập Claude Code với CLAUDE_CONFIG_DIR riêng, vd ~/.claude")
             if let cliStatus {
                 Text(cliStatus)
                     .font(.caption)
                     .foregroundStyle(cliOK ? Color.green : Color.red)
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("Dùng tài khoản đã đăng nhập trong Claude Code (gói Pro/Max), không tốn tiền API. Chậm hơn ~2–4s mỗi lần.")
                 .font(.caption2)
@@ -129,13 +133,14 @@ struct SettingsView: View {
         cliStatus = "Đang kiểm tra…"
         cliOK = true
         let customPath = settings.claudeCodePath
+        let configDir = settings.claudeConfigDir
         DispatchQueue.global().async {
             let path = ClaudeCodeClient.locate(customPath: customPath)
-            let version = path.flatMap { ClaudeCodeClient.version(executable: $0) }
+            let version = path.flatMap { ClaudeCodeClient.version(executable: $0, configDir: configDir) }
             DispatchQueue.main.async {
                 if let path, let version {
-                    cliStatus = "✓ \(version) — \(path)"
-                    cliOK = true
+                    cliStatus = "\(version) — đang thử gửi 1 câu…"
+                    checkLogin(executable: path, version: version)
                 } else if let path {
                     cliStatus = "Tìm thấy \(path) nhưng không chạy được"
                     cliOK = false
@@ -143,6 +148,37 @@ struct SettingsView: View {
                     cliStatus = "Không tìm thấy lệnh claude. Cài Claude Code rồi chạy `claude` để đăng nhập."
                     cliOK = false
                 }
+            }
+        }
+    }
+
+    /// `--version` chạy được chưa chắc đã đăng nhập được: gửi thử 1 prompt ngắn qua đúng
+    /// đường dịch thật (cùng model, CLAUDE_CONFIG_DIR), dừng ngay khi có token đầu tiên.
+    private func checkLogin(executable: String, version: String) {
+        let stream = ClaudeCodeClient.stream(
+            executable: executable, model: settings.model,
+            system: "Reply with exactly: OK", user: "ping"
+        )
+        Task { @MainActor in
+            do {
+                var gotReply = false
+                for try await _ in stream {
+                    gotReply = true
+                    break
+                }
+                cliOK = gotReply
+                cliStatus = gotReply
+                    ? "✓ \(version) — đã đăng nhập, gọi được Claude"
+                    : "\(version) — Claude không trả lời"
+            } catch {
+                cliOK = false
+                let message = error.localizedDescription
+                let authFailed = ["authenticate", "OAuth", "login", "log in"].contains {
+                    message.localizedCaseInsensitiveContains($0)
+                }
+                cliStatus = authFailed
+                    ? "✗ \(message)\nĐiền CLAUDE_CONFIG_DIR khớp với lúc đăng nhập trong terminal (vd ~/.claude), hoặc chạy `claude /login`."
+                    : "✗ \(message)"
             }
         }
     }
