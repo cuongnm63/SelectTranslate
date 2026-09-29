@@ -1,5 +1,9 @@
 APP_NAME := SelectTranslate
-APP      := build/$(APP_NAME).app
+# Bundle .app nằm ngoài ~/Desktop: iCloud (File Provider) gắn com.apple.FinderInfo lên .app
+# trong thư mục đồng bộ → codesign báo "detritus not allowed".
+APP_DIR  ?= $(HOME)/Library/Caches/$(APP_NAME)
+APP      := $(APP_DIR)/$(APP_NAME).app
+export APP_DIR
 BUNDLE_ID := com.cuongnguyen.SelectTranslate
 
 .PHONY: build app run install dmg reset-ax clean
@@ -27,4 +31,4 @@ reset-ax:         ## Xoá quyền Accessibility cũ (khi rebuild ad-hoc bị m�
 	tccutil reset Accessibility $(BUNDLE_ID)
 
 clean:
-	rm -rf .build build
+	rm -rf .build build "$(APP_DIR)"

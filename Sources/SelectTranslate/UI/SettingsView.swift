@@ -74,7 +74,7 @@ struct SettingsView: View {
             Divider()
 
             HStack {
-                Text("⌥D: dịch vùng đang bôi đen")
+                Text("⌥D: dịch · ⌥R: viết lại tiếng Anh")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -220,24 +220,34 @@ struct SettingsView: View {
     }
 
     private var historySection: some View {
-        section("Gần đây") {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(history.items.prefix(5)) { item in
-                    Button {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(item.translation, forType: .string)
-                    } label: {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Gần đây").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button("Xem tất cả") { HistoryWindowController.shared.show() }
+                    .buttonStyle(.link)
+                    .font(.caption)
+            }
+            ForEach(history.items.prefix(5)) { item in
+                Button {
+                    HistoryWindowController.shared.show(itemID: item.id)
+                } label: {
+                    HStack(alignment: .top, spacing: 6) {
+                        if item.mode == .rewrite {
+                            Image(systemName: "wand.and.stars")
+                                .font(.caption2)
+                                .foregroundStyle(Color.accentColor)
+                        }
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.source).lineLimit(1).font(.caption).foregroundStyle(.secondary)
-                            Text(item.translation).lineLimit(1).font(.callout)
+                            Text(item.preview).lineLimit(1).font(.callout)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .help("Click để copy bản dịch")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .help("Xem đầy đủ")
             }
         }
     }

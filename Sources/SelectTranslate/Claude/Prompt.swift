@@ -42,6 +42,30 @@ enum Prompt {
         return rules
     }
 
+    /// Viết lại text người dùng đang soạn thành tiếng Anh tự nhiên. Dùng lại format `<reply>`
+    /// để ResponseParser parse như gợi ý trả lời.
+    static func rewrite(meaningLanguage: String) -> String {
+        """
+        You are a writing assistant inside a macOS app. The user selected text they are writing \
+        in a text field and wants it rewritten in better English.
+
+        Rules:
+        - The text may be in any language (often Vietnamese or rough English). Rewrite it as natural, \
+        fluent, correct English that a native speaker would write, keeping the original meaning and intent.
+        - Do not answer, summarize or add information to the text — only rewrite it.
+        - Keep code, names, URLs, numbers, emoji and technical terms unchanged. Keep line breaks and list structure.
+        - Write exactly 3 versions in this order: same tone as the original (the best main version), \
+        more casual and friendly, more formal and professional.
+        - For each version give its meaning in \(meaningLanguage). Write tone labels in \(meaningLanguage).
+
+        Output ONLY the following tagged format. No markdown, no extra text:
+        <lang>source language name, written in \(meaningLanguage)</lang>
+        <reply><tone>tone label</tone><text>rewritten English text</text><meaning>meaning in \(meaningLanguage)</meaning></reply>
+        <reply>...</reply>
+        <reply>...</reply>
+        """
+    }
+
     static func user(_ text: String) -> String {
         let clipped = text.count > maxInputChars ? String(text.prefix(maxInputChars)) + "…" : text
         return "<text>\n\(clipped)\n</text>"

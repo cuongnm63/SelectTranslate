@@ -5,6 +5,8 @@ struct ResultView: View {
     @ObservedObject var session: TranslationSession
     @ObservedObject private var settings = AppSettings.shared
     var onClose: () -> Void
+    /// Dán đè text vào vùng đang chọn ở app nguồn (chế độ viết lại).
+    var onReplace: (String) -> Void
 
     private let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
@@ -34,17 +36,19 @@ struct ResultView: View {
                                 .font(.body)
                                 .textSelection(.enabled)
                         }
-                    } else if session.isLoading {
-                        Text("Đang dịch…").foregroundStyle(.secondary)
+                    } else if session.isLoading, session.replies.isEmpty {
+                        Text(isRewrite ? "Đang viết lại…" : "Đang dịch…").foregroundStyle(.secondary)
                     }
 
                     if !session.replies.isEmpty {
-                        Text("Gợi ý trả lời")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                        if !isRewrite {
+                            Text("Gợi ý trả lời")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                        }
                         ForEach(session.replies) { reply in
-                            ReplyRow(reply: reply)
+                            ReplyRow(reply: reply, onReplace: isRewrite ? { onReplace(reply.text) } : nil)
                         }
                     }
                 }
@@ -58,11 +62,18 @@ struct ResultView: View {
         .clipShape(shape)
     }
 
+    private var isRewrite: Bool { session.mode == .rewrite }
+
+    private var title: String {
+        if isRewrite { return "Viết lại bằng tiếng Anh" }
+        return session.sourceLang.isEmpty ? "Claude" : "\(session.sourceLang) → \(settings.targetLanguage)"
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "character.bubble")
+            Image(systemName: isRewrite ? "wand.and.stars" : "character.bubble")
                 .foregroundStyle(Color.accentColor)
-            Text(session.sourceLang.isEmpty ? "Claude" : "\(session.sourceLang) → \(settings.targetLanguage)")
+            Text(title)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             Spacer()
@@ -79,11 +90,12 @@ struct ResultView: View {
     }
 }
 
-private struct ReplyRow: View {
+struct ReplyRow: View {
     let reply: TranslationSession.Reply
+    var onReplace: (() -> Void)?
 
     var body: some View {
-        CopyableBlock(text: reply.text) {
+        CopyableBlock(text: reply.text, onReplace: onReplace) {
             VStack(alignment: .leading, spacing: 4) {
                 if !reply.tone.isEmpty {
                     Text(reply.tone)
@@ -107,9 +119,10 @@ private struct ReplyRow: View {
     }
 }
 
-/// Khối nội dung có nút copy ở góc phải.
-private struct CopyableBlock<Content: View>: View {
+/// Khối nội dung có nút copy (và nút thay thế nếu có) ở góc phải.
+struct CopyableBlock<Content: View>: View {
     let text: String
+    var onReplace: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
     @State private var copied = false
 
@@ -117,6 +130,11 @@ private struct CopyableBlock<Content: View>: View {
         HStack(alignment: .top, spacing: 8) {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let onReplace {
+                Button("Thay thế", action: onReplace)
+                    .controlSize(.small)
+                    .help("Dán đè vào chỗ đang bôi đen")
+            }
             Button {
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()

@@ -18,7 +18,7 @@ struct SelectTranslateApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popup = PopupController()
     private let monitor = SelectionMonitor()
-    private var hotKey: HotKey?
+    private var hotKeys: [HotKey] = []
     private var localKeyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -34,8 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         monitor.onMouseDown = { [weak self] in self?.popup.hideAll() }
         monitor.onEscape = { [weak self] in self?.popup.hideAll() }
-        monitor.onSelection = { [weak self] text, point in
-            self?.popup.showTrigger(text: text, at: point)
+        monitor.onSelection = { [weak self] selection, point in
+            self?.popup.showTrigger(selection: selection, at: point)
         }
         monitor.start()
 
@@ -48,10 +48,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
-        // ⌥D: dịch ngay vùng đang bôi đen, không cần bấm nút.
-        hotKey = HotKey(keyCode: UInt32(kVK_ANSI_D), modifiers: UInt32(optionKey)) { [weak self] in
-            self?.popup.translateCurrentSelection()
-        }
+        // ⌥D: dịch ngay vùng đang bôi đen, ⌥R: viết lại bằng tiếng Anh — không cần bấm nút.
+        hotKeys = [
+            HotKey(keyCode: UInt32(kVK_ANSI_D), modifiers: UInt32(optionKey)) { [weak self] in
+                self?.popup.openCurrentSelection(mode: .translate)
+            },
+            HotKey(keyCode: UInt32(kVK_ANSI_R), modifiers: UInt32(optionKey)) { [weak self] in
+                self?.popup.openCurrentSelection(mode: .rewrite)
+            },
+        ]
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -9,7 +9,9 @@ cd "$(dirname "$0")/.."
 APP_NAME="SelectTranslate"
 CONFIG="${CONFIG:-release}"
 IDENTITY="${SIGN_IDENTITY:--}"
-APP="build/${APP_NAME}.app"
+# Ngoài ~/Desktop: iCloud gắn com.apple.FinderInfo lên .app → codesign từ chối (xem Makefile).
+APP_DIR="${APP_DIR:-${HOME}/Library/Caches/${APP_NAME}}"
+APP="${APP_DIR}/${APP_NAME}.app"
 
 echo "▸ swift build -c ${CONFIG}"
 swift build -c "${CONFIG}"
@@ -21,6 +23,8 @@ mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "${BIN_DIR}/${APP_NAME}" "${APP}/Contents/MacOS/${APP_NAME}"
 cp Resources/Info.plist "${APP}/Contents/Info.plist"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "${APP}/Contents/Resources/"; fi
+
+xattr -cr "${APP}"
 
 echo "▸ codesign (${IDENTITY})"
 codesign --force --options runtime --timestamp=none --sign "${IDENTITY}" "${APP}"

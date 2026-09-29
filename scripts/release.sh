@@ -15,7 +15,9 @@ cd "$(dirname "$0")/.."
 APP_NAME="SelectTranslate"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)"
 IDENTITY="${SIGN_IDENTITY:--}"
-APP="build/${APP_NAME}.app"
+# Ngoài ~/Desktop: iCloud gắn com.apple.FinderInfo lên .app → codesign từ chối (xem Makefile).
+APP_DIR="${APP_DIR:-${HOME}/Library/Caches/${APP_NAME}}"
+APP="${APP_DIR}/${APP_NAME}.app"
 DMG="build/${APP_NAME}-${VERSION}.dmg"
 ARCHS=(arm64 x86_64)
 
@@ -35,6 +37,8 @@ lipo -create "${BINS[@]}" -output "${APP}/Contents/MacOS/${APP_NAME}"
 cp Resources/Info.plist "${APP}/Contents/Info.plist"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "${APP}/Contents/Resources/"; fi
 
+xattr -cr "${APP}"
+
 echo "▸ Ký app (${IDENTITY})"
 if [[ "${IDENTITY}" == "-" ]]; then
   codesign --force --options runtime --sign - "${APP}"
@@ -47,6 +51,7 @@ echo "▸ Tạo DMG"
 STAGE="$(mktemp -d)"
 cp -R "${APP}" "${STAGE}/"
 ln -s /Applications "${STAGE}/Applications"
+mkdir -p build
 rm -f "${DMG}"
 hdiutil create -volname "Select Translate" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}" >/dev/null
 rm -rf "${STAGE}"

@@ -2,13 +2,20 @@ import Foundation
 
 /// State của một lần dịch, hiển thị trong ResultView.
 final class TranslationSession: ObservableObject {
-    struct Reply: Identifiable, Equatable {
+    enum Mode: String, Codable {
+        case translate
+        /// Viết lại text đang soạn thành tiếng Anh (3 phiên bản trong `replies`).
+        case rewrite
+    }
+
+    struct Reply: Identifiable, Equatable, Codable {
         let id: Int
         var tone: String
         var text: String
         var meaning: String
     }
 
+    @Published private(set) var mode = Mode.translate
     @Published private(set) var sourceText = ""
     @Published private(set) var sourceLang = ""
     @Published private(set) var translation = ""
@@ -18,8 +25,9 @@ final class TranslationSession: ObservableObject {
 
     private var task: Task<Void, Never>?
 
-    func start(text: String) {
+    func start(text: String, mode: Mode) {
         task?.cancel()
+        self.mode = mode
         sourceText = text
         sourceLang = ""
         translation = ""
@@ -27,7 +35,10 @@ final class TranslationSession: ObservableObject {
         errorMessage = nil
 
         let settings = AppSettings.shared
-        let system = Prompt.system(target: settings.targetLanguage, suggestReplies: settings.suggestReplies)
+        let system = switch mode {
+        case .translate: Prompt.system(target: settings.targetLanguage, suggestReplies: settings.suggestReplies)
+        case .rewrite: Prompt.rewrite(meaningLanguage: settings.targetLanguage)
+        }
         let user = Prompt.user(text)
 
         let stream: AsyncThrowingStream<String, Error>
@@ -63,12 +74,14 @@ final class TranslationSession: ObservableObject {
                 guard let self, !Task.isCancelled else { return }
                 self.apply(ResponseParser.parse(buffer))
                 self.isLoading = false
-                if self.translation.isEmpty, !buffer.isEmpty {
+                if self.translation.isEmpty, self.replies.isEmpty || mode == .translate, !buffer.isEmpty {
                     // Model không theo format: hiển thị nguyên văn.
                     self.translation = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
-                if !self.translation.isEmpty {
-                    HistoryStore.shared.add(source: text, translation: self.translation)
+                if !self.translation.isEmpty || !self.replies.isEmpty {
+                    HistoryStore.shared.add(
+                        mode: mode, source: text, translation: self.translation, replies: self.replies
+                    )
                 }
             } catch is CancellationError {
                 return

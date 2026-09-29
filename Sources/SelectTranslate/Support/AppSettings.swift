@@ -105,22 +105,3 @@ final class AppSettings: ObservableObject {
         )
     }
 }
-
-final class HistoryStore: ObservableObject {
-    static let shared = HistoryStore()
-
-    struct Item: Identifiable {
-        let id = UUID()
-        let source: String
-        let translation: String
-    }
-
-    @Published private(set) var items: [Item] = []
-
-    func add(source: String, translation: String) {
-        items.insert(Item(source: source, translation: translation), at: 0)
-        if items.count > 20 { items.removeLast(items.count - 20) }
-    }
-
-    func clear() { items.removeAll() }
-}

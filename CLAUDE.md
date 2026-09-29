@@ -4,17 +4,19 @@ macOS menu-bar-only app (Swift Package, SwiftUI + AppKit, macOS 13+). Selecting 
 
 ## Commands
 - `make build` — compile only (`swift build`). Run this first after any change.
-- `make run` — build, package `build/SelectTranslate.app` (scripts/build-app.sh), ad-hoc sign, open.
+- `make run` — build, package `~/Library/Caches/SelectTranslate/SelectTranslate.app` (outside iCloud-synced Desktop: File Provider adds FinderInfo xattrs that break codesign) (scripts/build-app.sh), ad-hoc sign, open.
 - `make install` — copy to /Applications.
 - `make reset-ax` — reset Accessibility permission (needed after ad-hoc rebuilds).
 
 ## Architecture
-- `SelectTranslateApp.swift`: `MenuBarExtra(.window)` → `SettingsView`; `AppDelegate` wires `SelectionMonitor` → `PopupController`, registers ⌥D `HotKey`.
+- `SelectTranslateApp.swift`: `MenuBarExtra(.window)` → `SettingsView`; `AppDelegate` wires `SelectionMonitor` → `PopupController`, registers `HotKey`s ⌥D (translate) and ⌥R (rewrite).
 - Selection: global `NSEvent` monitors (mouse down/up, Esc). On drag > 6px or multi-click, `SelectionReader` reads `kAXSelectedTextAttribute`; if AX is unsupported it simulates ⌘C and restores the clipboard.
 - UI: `FloatingPanel` = borderless `.nonactivatingPanel` at `.popUpMenu` level so the source app keeps focus. `FirstMouseHostingView` makes first click work.
 - Claude: `ClaudeClient.stream` parses SSE `content_block_delta`. Prompt asks for a tagged format (`<lang>`, `<translation>`, `<reply><tone><text><meaning>`) that `ResponseParser` parses incrementally while streaming.
+- Rewrite mode (`TranslationSession.Mode.rewrite`): the trigger's rewrite button shows only when `SelectionReader` reports an editable AX element (never for the ⌘C fallback); ⌥R always allows it. `Prompt.rewrite` reuses the `<reply>` format → 3 English versions; "Thay thế" pastes via ⌘V into `sourceApp` and restores the clipboard.
 - Two providers (`AppSettings.provider`): `.apiKey` → `ClaudeClient` (HTTP SSE); `.claudeCode` → `ClaudeCodeClient` runs `claude -p --output-format stream-json --verbose --include-partial-messages --system-prompt … --max-turns 1` in a temp dir, strips `ANTHROPIC_API_KEY` so the logged-in Pro/Max account is used, and resolves PATH via login shell (GUI apps lack terminal PATH; nvm installs need node on PATH).
 - Settings in UserDefaults; API key in Keychain (env `ANTHROPIC_API_KEY` as fallback).
+- History: `HistoryStore` (translate + rewrite results, max 100) persisted as JSON in `~/Library/Application Support/SelectTranslate/history.json`; `HistoryWindowController` shows the full list, opened from Settings "Gần đây".
 
 ## Constraints
 - Swift 5 language mode (tools 5.9); classes are intentionally not `@MainActor`-annotated. Everything UI runs on main via AppKit callbacks / `DispatchQueue.main` / `Task { @MainActor in }`.
@@ -23,4 +25,4 @@ macOS menu-bar-only app (Swift Package, SwiftUI + AppKit, macOS 13+). Selecting 
 
 ## Ideas / TODO
 - Use `kAXBoundsForRangeParameterizedAttribute` to anchor the button to the selection instead of the mouse.
-- Configurable hotkey; "insert reply" into the source app; pin popup; history persistence.
+- Configurable hotkey; "insert reply" into the source app; pin popup.

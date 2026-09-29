@@ -6,7 +6,7 @@ import Carbon.HIToolbox
 final class SelectionMonitor {
     var onMouseDown: (() -> Void)?
     var onEscape: (() -> Void)?
-    var onSelection: ((String, NSPoint) -> Void)?
+    var onSelection: ((SelectionReader.Selection, NSPoint) -> Void)?
 
     private var monitors: [Any] = []
     private var downPoint: NSPoint = .zero
@@ -58,10 +58,10 @@ final class SelectionMonitor {
         let gen = generation
         let policy: SelectionReader.FallbackPolicy = settings.useCopyFallback ? .whenUnsupported : .never
         let item = DispatchWorkItem { [weak self] in
-            SelectionReader.read(fallback: policy) { text in
+            SelectionReader.read(fallback: policy) { selection in
                 guard let self, gen == self.generation,
-                      let text, text.count >= settings.minChars else { return }
-                self.onSelection?(text, upPoint)
+                      let selection, selection.text.count >= settings.minChars else { return }
+                self.onSelection?(selection, upPoint)
             }
         }
         pending = item

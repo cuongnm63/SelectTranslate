@@ -14,17 +14,26 @@ enum SelectionReader {
         case always
     }
 
+    struct Selection {
+        let text: String
+        /// Vùng chọn nằm trong ô sửa được (text field...) → có thể "Viết lại" và dán đè.
+        /// Đọc bằng ⌘C thì không biết được nên luôn là false.
+        let editable: Bool
+    }
+
     private enum AXResult {
-        case text(String)
+        case text(String, editable: Bool)
         case empty
         case unsupported
     }
 
-    static func read(fallback: FallbackPolicy, completion: @escaping (String?) -> Void) {
+    private static let editableRoles: Set<String> = ["AXTextField", "AXTextArea", "AXComboBox"]
+
+    static func read(fallback: FallbackPolicy, completion: @escaping (Selection?) -> Void) {
         let result = readViaAccessibility()
         switch (result, fallback) {
-        case (.text(let text), _):
-            completion(text)
+        case (.text(let text, let editable), _):
+            completion(Selection(text: text, editable: editable))
         case (.unsupported, .whenUnsupported), (_, .always):
             readViaCopy(completion: completion)
         default:
@@ -49,10 +58,23 @@ enum SelectionReader {
         else { return .unsupported }
 
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? .empty : .text(trimmed)
+        return trimmed.isEmpty ? .empty : .text(trimmed, editable: isEditable(focused))
     }
 
-    private static func readViaCopy(completion: @escaping (String?) -> Void) {
+    private static func isEditable(_ element: AXUIElement) -> Bool {
+        var settable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success,
+           settable.boolValue {
+            return true
+        }
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
+              let role = roleRef as? String
+        else { return false }
+        return editableRoles.contains(role)
+    }
+
+    private static func readViaCopy(completion: @escaping (Selection?) -> Void) {
         let pasteboard = NSPasteboard.general
         let snapshot = PasteboardSnapshot(pasteboard)
         let before = pasteboard.changeCount
@@ -68,7 +90,7 @@ enum SelectionReader {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             snapshot.restore(to: pasteboard)
             if let text, !text.isEmpty {
-                completion(text)
+                completion(Selection(text: text, editable: false))
             } else {
                 completion(nil)
             }
