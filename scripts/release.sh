@@ -24,16 +24,21 @@ ARCHS=(arm64 x86_64)
 # Build từng arch rồi lipo: `swift build --arch a --arch b` cần XCBuild (chỉ có trong
 # Xcode.app), còn cách này chạy được với Command Line Tools.
 echo "▸ Build universal (Apple Silicon + Intel) v${VERSION}"
+# Swift 6.4+ ghi mọi arch vào cùng .build/out/Products/Release → copy binary ra ngay sau mỗi lần build.
+BIN_STAGE="$(mktemp -d)"
 BINS=()
 for arch in "${ARCHS[@]}"; do
   swift build -c release --triple "${arch}-apple-macosx"
-  BINS+=("$(swift build -c release --triple "${arch}-apple-macosx" --show-bin-path)/${APP_NAME}")
+  cp "$(swift build -c release --triple "${arch}-apple-macosx" --show-bin-path)/${APP_NAME}" "${BIN_STAGE}/${APP_NAME}-${arch}"
+  BINS+=("${BIN_STAGE}/${APP_NAME}-${arch}")
 done
 
 echo "▸ Đóng gói ${APP}"
 rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 lipo -create "${BINS[@]}" -output "${APP}/Contents/MacOS/${APP_NAME}"
+rm -rf "${BIN_STAGE}"
+lipo -info "${APP}/Contents/MacOS/${APP_NAME}"
 cp Resources/Info.plist "${APP}/Contents/Info.plist"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "${APP}/Contents/Resources/"; fi
 

@@ -8,12 +8,12 @@ struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var history = HistoryStore.shared
 
-    @State private var keyDraft = ""
-    @State private var trusted = AXIsProcessTrusted()
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var launchError: String?
-    @State private var cliStatus: String?
-    @State private var cliOK = true
+    @ViewState private var keyDraft = ""
+    @ViewState private var trusted = AXIsProcessTrusted()
+    @ViewState private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @ViewState private var launchError: String?
+    @ViewState private var cliStatus: String?
+    @ViewState private var cliOK = true
 
     private let axTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 

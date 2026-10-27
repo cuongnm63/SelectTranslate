@@ -124,7 +124,7 @@ struct CopyableBlock<Content: View>: View {
     let text: String
     var onReplace: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
-    @State private var copied = false
+    @ViewState private var copied = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {

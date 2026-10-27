@@ -24,7 +24,7 @@ private struct CircleButton: View {
     let icon: String
     let help: String
     let action: () -> Void
-    @State private var hovering = false
+    @ViewState private var hovering = false
 
     var body: some View {
         Button(action: action) {
